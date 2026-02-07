@@ -5,13 +5,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>CivicPulse | Hyperlocal Awareness</title>
-  
+
   <!-- Libraries -->
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -24,7 +24,7 @@
     }
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-    
+
     .leaflet-container { width: 100%; height: 100%; background: #f1f5f9; z-index: 1; }
     .leaflet-control-zoom { display: none !important; }
     .custom-div-icon { background: none; border: none; }
@@ -52,6 +52,7 @@
 </script>
 </head>
 <body>
+  <div id="root"></div>
   <div id="map"></div>
 
   <script type="text/babel" data-type="module">
@@ -171,7 +172,7 @@
     const MapScreen = ({ issues, onIssueClick, onStartPost, onActionClick }) => {
       const [selected, setSelected] = useState(null);
       const defaultPos = [11.2588, 75.7804];
-      
+
       const MapEvents = () => {
         useMapEvents({ click(e) { onStartPost(e.latlng.lat, e.latlng.lng); } });
         return null;
@@ -223,7 +224,7 @@
 
     const IssueDetailScreen = ({ issue, onBack, onSupport, onResolve, onCloseResolution }) => {
       const [showProof, setShowProof] = useState(false);
-      
+
       return (
         <div className="h-full bg-white flex flex-col animate-in slide-in-from-right duration-300 relative overflow-hidden">
           <div className="h-64 md:h-96 relative shrink-0">
@@ -402,4 +403,3 @@
   </script>
 </body>
 </html>
-
