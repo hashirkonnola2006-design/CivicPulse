@@ -72,6 +72,7 @@
     const MOCK_ISSUES = [
       {
         id: '1',
+        type: 'issue',
         title: 'Overflowing Plastic Bin near KSRTC',
         description: 'A critical waste accumulation point near Mavoor Road. Plastic bottles and non-biodegradable bags are blocking the drainage path.',
         category: 'Waste', area: 'Mavoor Road', status: 'Gaining Attention',
@@ -82,12 +83,35 @@
       },
       {
         id: '2',
+        type: 'issue',
         title: 'Beach Plastic Litter',
         description: 'Massive plastic pollution along the South Beach shoreline following the weekend event.',
         category: 'Waste', area: 'Kozhikode Beach', status: 'Verified',
         supportCount: 128, rewardPoints: 100, isVerified: true,
         image: 'https://images.unsplash.com/photo-1611284446314-60a58ac0deb9?auto=format&fit=crop&q=80&w=1200',
         lat: 11.2625, lng: 75.7672, createdAt: 'Oct 27, 2023', creator: 'EcoWarrior',
+        comments: []
+      },
+      {
+        id: 's1',
+        type: 'suggestion',
+        title: 'Solar Street Lights for S.M. Street',
+        description: 'We should propose solar-powered LED street lights for the entire S.M. Street corridor to improve safety and reduce energy costs.',
+        category: 'Sanitation', area: 'S.M. Street', status: 'Proposed',
+        supportCount: 42, rewardPoints: 30, isVerified: false,
+        image: 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?auto=format&fit=crop&q=80&w=1200',
+        lat: 11.2530, lng: 75.7820, createdAt: '2 days ago', creator: 'SolarFan',
+        comments: []
+      },
+      {
+        id: 's2',
+        type: 'suggestion',
+        title: 'Community Composting Unit',
+        description: 'Suggestion to install a solar-powered composting unit in Ward 4 to reduce organic waste transport and create local fertilizer.',
+        category: 'Recycling', area: 'Civil Station', status: 'Proposed',
+        supportCount: 89, rewardPoints: 40, isVerified: true,
+        image: 'https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?auto=format&fit=crop&q=80&w=1200',
+        lat: 11.2750, lng: 75.7950, createdAt: '1 day ago', creator: 'GreenCalicut',
         comments: []
       }
     ];
@@ -118,14 +142,43 @@
 
     const FeedScreen = ({ issues, onIssueClick, onSupport, onActionClick }) => {
       const [filter, setFilter] = useState('All');
-      const activeIssues = issues.filter(i => i.status !== 'Resolved');
+      const [feedView, setFeedView] = useState('Issues'); // Issues | Suggestions | Trending
+      
+      const filteredContent = useMemo(() => {
+        let list = issues.filter(i => i.status !== 'Resolved');
+        
+        if (feedView === 'Issues') {
+          list = list.filter(i => i.type === 'issue');
+        } else if (feedView === 'Suggestions') {
+          list = list.filter(i => i.type === 'suggestion');
+        } else if (feedView === 'Trending') {
+          list = [...list].sort((a, b) => b.supportCount - a.supportCount);
+        }
+
+        if (filter !== 'All') {
+          list = list.filter(i => i.category === filter);
+        }
+        
+        return list;
+      }, [issues, feedView, filter]);
 
       return (
         <div className="space-y-8 animate-in fade-in duration-500">
           <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tighter">Community Feed</h2>
-              <p className="text-slate-500 font-medium">Real-time alerts from your neighborhood.</p>
+              <div className="flex gap-4 mt-2">
+                {['Issues', 'Suggestions', 'Trending'].map(v => (
+                  <button 
+                    key={v} 
+                    onClick={() => setFeedView(v)}
+                    className={`text-sm font-bold transition-all relative pb-1 ${feedView === v ? 'text-blue-600' : 'text-slate-400'}`}
+                  >
+                    {v}
+                    {feedView === v && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-full" />}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="flex gap-2 overflow-x-auto no-scrollbar py-2">
               {['All', ...CATEGORIES.map(c => c.name)].map(cat => (
@@ -139,31 +192,46 @@
             </div>
           </header>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 md:gap-8">
-            {activeIssues.filter(i => filter === 'All' || i.category === filter).map(issue => (
-              <div key={issue.id} onClick={() => onIssueClick(issue)} className="bg-white rounded-[32px] overflow-hidden border border-slate-100 shadow-sm hover:shadow-xl transition-all group cursor-pointer flex flex-col">
-                <div className="relative aspect-[4/3] overflow-hidden">
-                  <img src={issue.image} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                  <div className="absolute top-4 left-4 bg-blue-600 text-white px-3 py-1.5 rounded-xl font-black text-[10px] shadow-lg border border-white/20">+{issue.rewardPoints} PTS</div>
-                </div>
-                <div className="p-6 flex flex-col flex-1">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Badge variant="info">{issue.category}</Badge>
-                    <span className="text-[10px] font-bold text-slate-400">{issue.createdAt}</span>
-                  </div>
-                  <h3 className="text-xl font-black text-slate-900 mb-2 leading-tight group-hover:text-blue-600 transition-colors">{issue.title}</h3>
-                  <p className="text-sm text-slate-500 line-clamp-2 mb-6 font-medium">{issue.description}</p>
-                  <div className="mt-auto pt-6 border-t flex justify-between items-center">
-                    <div className="flex gap-4">
-                      <button onClick={(e) => { e.stopPropagation(); onSupport(issue.id); }} className="flex items-center gap-2 text-slate-500 hover:text-blue-600"><Lucide.ThumbsUp size={18} /> <span className="text-sm font-black">{issue.supportCount}</span></button>
-                      <div className="flex items-center gap-2 text-slate-500"><Lucide.MessageSquare size={18} /> <span className="text-sm font-black">{issue.comments.length}</span></div>
-                    </div>
-                    <Badge variant="warning">{issue.status}</Badge>
-                  </div>
-                </div>
+          {filteredContent.length === 0 ? (
+            <div className="py-20 text-center">
+              <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300">
+                <Lucide.Inbox size={40} />
               </div>
-            ))}
-          </div>
+              <h3 className="text-xl font-bold text-slate-900">No {feedView.toLowerCase()} found</h3>
+              <p className="text-slate-500">Be the first to raise one in this category!</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 md:gap-8">
+              {filteredContent.map(item => (
+                <div key={item.id} onClick={() => onIssueClick(item)} className="bg-white rounded-[32px] overflow-hidden border border-slate-100 shadow-sm hover:shadow-xl transition-all group cursor-pointer flex flex-col">
+                  <div className="relative aspect-[4/3] overflow-hidden">
+                    <img src={item.image} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    <div className="absolute top-4 left-4 bg-blue-600 text-white px-3 py-1.5 rounded-xl font-black text-[10px] shadow-lg border border-white/20">+{item.rewardPoints} PTS</div>
+                    {item.type === 'suggestion' && (
+                      <div className="absolute top-4 right-4 bg-green-500 text-white p-1.5 rounded-lg shadow-lg">
+                        <Lucide.Lightbulb size={14} />
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-6 flex flex-col flex-1">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Badge variant={item.type === 'suggestion' ? 'success' : 'info'}>{item.category}</Badge>
+                      <span className="text-[10px] font-bold text-slate-400">{item.createdAt}</span>
+                    </div>
+                    <h3 className="text-xl font-black text-slate-900 mb-2 leading-tight group-hover:text-blue-600 transition-colors">{item.title}</h3>
+                    <p className="text-sm text-slate-500 line-clamp-2 mb-6 font-medium">{item.description}</p>
+                    <div className="mt-auto pt-6 border-t flex justify-between items-center">
+                      <div className="flex gap-4">
+                        <button onClick={(e) => { e.stopPropagation(); onSupport(item.id); }} className="flex items-center gap-2 text-slate-500 hover:text-blue-600"><Lucide.ThumbsUp size={18} /> <span className="text-sm font-black">{item.supportCount}</span></button>
+                        <div className="flex items-center gap-2 text-slate-500"><Lucide.MessageSquare size={18} /> <span className="text-sm font-black">{item.comments.length}</span></div>
+                      </div>
+                      <Badge variant={item.status === 'Proposed' ? 'success' : 'warning'}>{item.status}</Badge>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       );
     };
@@ -177,9 +245,9 @@
         return null;
       };
 
-      const createIcon = (cat, status) => L.divIcon({
+      const createIcon = (item) => L.divIcon({
         className: 'custom-div-icon',
-        html: `<div class="w-10 h-10 ${status === 'Resolved' ? 'bg-green-600' : 'bg-blue-600'} rounded-2xl border-4 border-white shadow-xl flex items-center justify-center text-white"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg></div>`,
+        html: `<div class="w-10 h-10 ${item.type === 'suggestion' ? 'bg-green-500' : 'bg-blue-600'} rounded-2xl border-4 border-white shadow-xl flex items-center justify-center text-white"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg></div>`,
         iconSize: [40, 40], iconAnchor: [20, 20]
       });
 
@@ -188,12 +256,12 @@
           <MapContainer center={defaultPos} zoom={14} className="h-full w-full">
             <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
             <MapEvents />
-            {issues.map(issue => (
+            {issues.map(item => (
               <Marker 
-                key={issue.id} 
-                position={[issue.lat, issue.lng]} 
-                icon={createIcon(issue.category, issue.status)}
-                eventHandlers={{ click: () => setSelected(issue) }}
+                key={item.id} 
+                position={[item.lat, item.lng]} 
+                icon={createIcon(item)}
+                eventHandlers={{ click: () => setSelected(item) }}
               />
             ))}
           </MapContainer>
@@ -215,7 +283,7 @@
           )}
           <div className="absolute top-6 left-6 z-[1000] bg-white p-4 rounded-2xl shadow-xl border md:flex hidden items-center gap-4">
             <Lucide.Info className="text-blue-600" size={20} />
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Tap anywhere on map to report a new issue</p>
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Tap anywhere on map to report a new issue or suggestion</p>
           </div>
         </div>
       );
@@ -223,6 +291,7 @@
 
     const IssueDetailScreen = ({ issue, onBack, onSupport, onResolve, onCloseResolution }) => {
       const [showProof, setShowProof] = useState(false);
+      const isSuggestion = issue.type === 'suggestion';
       
       return (
         <div className="h-full bg-white flex flex-col animate-in slide-in-from-right duration-300 relative overflow-hidden">
@@ -231,27 +300,34 @@
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
             <button onClick={onBack} className="absolute top-6 left-6 p-3 bg-white/90 rounded-2xl shadow-xl"><Lucide.ArrowLeft size={20} /></button>
             <div className="absolute bottom-8 left-8 right-8">
-              <Badge variant="info">{issue.status}</Badge>
+              <Badge variant={isSuggestion ? 'success' : 'info'}>{issue.status}</Badge>
               <h2 className="text-3xl md:text-5xl font-black text-white mt-2 leading-tight">{issue.title}</h2>
             </div>
           </div>
           <div className="flex-1 overflow-y-auto p-8 md:p-12 space-y-10 no-scrollbar pb-32">
             <section>
-              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">The Context</h4>
+              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">{isSuggestion ? 'The Proposal' : 'The Context'}</h4>
               <p className="text-lg text-slate-600 font-medium leading-relaxed">{issue.description}</p>
             </section>
             <section className="bg-slate-50 p-6 rounded-[32px] border border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className="bg-blue-600 p-3 rounded-xl text-white"><Lucide.MapPin size={24} /></div>
+                <div className={`${isSuggestion ? 'bg-green-600' : 'bg-blue-600'} p-3 rounded-xl text-white`}><Lucide.MapPin size={24} /></div>
                 <div><h5 className="font-black text-slate-900">{issue.area}</h5><p className="text-xs text-slate-400">Neighborhood Hotspot</p></div>
               </div>
               <Lucide.ChevronRight className="text-slate-300" />
             </section>
-            {issue.status !== 'Resolved' && (
+            {!isSuggestion && issue.status !== 'Resolved' && (
               <section className="bg-blue-600 p-8 rounded-[40px] text-white shadow-2xl shadow-blue-100">
                 <h4 className="text-xl font-black mb-2">Be a Local Hero</h4>
                 <p className="text-blue-100 mb-8 font-medium">Earn +{issue.rewardPoints * 2} community points by resolving this.</p>
                 <Button onClick={() => setShowProof(true)} className="w-full bg-white text-blue-600 py-4 rounded-[24px]">Complete Mission</Button>
+              </section>
+            )}
+            {isSuggestion && (
+              <section className="bg-green-600 p-8 rounded-[40px] text-white shadow-2xl shadow-green-100">
+                <h4 className="text-xl font-black mb-2">Support this Proposal</h4>
+                <p className="text-green-100 mb-8 font-medium">Community suggestions need {Math.max(0, 100 - issue.supportCount)} more boosts to be escalated to neighborhood council.</p>
+                <Button onClick={() => onSupport(issue.id)} className="w-full bg-white text-green-600 py-4 rounded-[24px]">Support Proposal</Button>
               </section>
             )}
           </div>
@@ -271,7 +347,7 @@
             </div>
           )}
           <div className="absolute bottom-0 left-0 right-0 p-8 bg-white/95 backdrop-blur-md border-t flex gap-4 pb-12">
-            <Button onClick={() => onSupport(issue.id)} className="flex-1 py-4 text-lg">Support Alert</Button>
+            <Button onClick={() => onSupport(issue.id)} className="flex-1 py-4 text-lg">Support {isSuggestion ? 'Proposal' : 'Alert'}</Button>
             <Button variant="outline" className="px-6"><Lucide.Share2 size={24} /></Button>
           </div>
         </div>
@@ -281,6 +357,7 @@
     const PostScreen = ({ onPost, initialCoords }) => {
       const [title, setTitle] = useState('');
       const [category, setCategory] = useState('');
+      const [postType, setPostType] = useState('Issue'); // Issue | Suggestion
       const [image, setImage] = useState(null);
       const fileInputRef = useRef(null);
 
@@ -302,8 +379,18 @@
       return (
         <div className="h-full bg-white rounded-[48px] shadow-2xl overflow-hidden flex flex-col border max-w-3xl mx-auto">
           <header className="p-8 border-b bg-slate-50 flex justify-between items-center">
-            <h2 className="text-2xl font-black">Raise New Alert</h2>
-            <Lucide.ShieldAlert className="text-blue-600" size={32} />
+            <h2 className="text-2xl font-black">New {postType}</h2>
+            <div className="flex bg-white rounded-xl p-1 border">
+              {['Issue', 'Suggestion'].map(t => (
+                <button 
+                  key={t}
+                  onClick={() => setPostType(t)}
+                  className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all ${postType === t ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400'}`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
           </header>
           <div className="flex-1 overflow-y-auto p-8 space-y-8 no-scrollbar">
             <div 
@@ -315,7 +402,7 @@
               ) : (
                 <>
                   <Lucide.Camera size={48} />
-                  <span className="text-xs font-black uppercase">Add Photo Evidence</span>
+                  <span className="text-xs font-black uppercase">Add Photo {postType === 'Issue' ? 'Evidence' : 'Context'}</span>
                 </>
               )}
               <input 
@@ -334,7 +421,7 @@
                     <button 
                       key={c.id} 
                       onClick={() => setCategory(c.name)} 
-                      className={`px-6 py-2.5 rounded-full text-xs font-black transition-all border-2 ${category === c.name ? 'bg-blue-600 border-blue-600 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'}`}
+                      className={`px-6 py-2.5 rounded-full text-xs font-black transition-all border-2 ${category === c.name ? (postType === 'Issue' ? 'bg-blue-600 border-blue-600 text-white shadow-lg' : 'bg-green-600 border-green-600 text-white shadow-lg') : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'}`}
                     >
                       {c.name}
                     </button>
@@ -342,11 +429,11 @@
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Title</label>
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">{postType} Title</label>
                 <input 
                   value={title} 
                   onChange={e => setTitle(e.target.value)} 
-                  placeholder="e.g. Broken water pipe near bus stop" 
+                  placeholder={postType === 'Issue' ? "e.g. Broken water pipe near bus stop" : "e.g. Propose bike lanes on Church Road"} 
                   className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:border-blue-600 outline-none font-bold placeholder:font-medium" 
                 />
               </div>
@@ -356,21 +443,23 @@
             <Button 
               onClick={() => onPost({ 
                 id: Math.random().toString(), 
+                type: postType.toLowerCase(),
                 title, 
                 category, 
                 image: image || 'https://images.unsplash.com/photo-1528190336454-13cd56b45b5a?auto=format&fit=crop&w=600', 
                 supportCount: 0, 
                 comments: [], 
-                status: 'Reported', 
-                rewardPoints: 50, 
+                status: postType === 'Issue' ? 'Reported' : 'Proposed', 
+                rewardPoints: postType === 'Issue' ? 50 : 30, 
                 lat: initialCoords?.lat || 11.25, 
                 lng: initialCoords?.lng || 75.78, 
                 area: initialCoords ? `Lat: ${initialCoords.lat.toFixed(3)}` : 'Neighborhood Zone' 
               })} 
               disabled={!title || !category} 
+              variant={postType === 'Issue' ? 'primary' : 'secondary'}
               className="flex-1 py-5 text-lg"
             >
-              Post to Neighborhood
+              Post {postType} to Neighborhood
             </Button>
           </div>
         </div>
@@ -403,7 +492,7 @@
       const handleNewPost = (newIssue) => {
         setIssues([newIssue, ...issues]);
         setTab('feed');
-        showToast("Report successful!", "success");
+        showToast(`${newIssue.type.charAt(0).toUpperCase() + newIssue.type.slice(1)} successful!`, "success");
         setPrefilled(null);
       };
 
@@ -433,7 +522,7 @@
                 </button>
               ))}
             </nav>
-            <Button onClick={() => setTab('post')} className="py-4 mt-8"><Lucide.PlusCircle size={20} /> Raise Issue</Button>
+            <Button onClick={() => setTab('post')} className="py-4 mt-8"><Lucide.PlusCircle size={20} /> Raise Post</Button>
           </aside>
 
           {/* Main Container */}
