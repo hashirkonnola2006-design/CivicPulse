@@ -291,7 +291,6 @@
             <div className="h-48 bg-slate-100 rounded-[32px] border-4 border-dashed flex flex-col items-center justify-center text-slate-400 gap-2">
               <Lucide.Camera size={48} />
               <span className="text-xs font-black uppercase">Add Photo Evidence</span>
-              <input type="file" id="imageInput" />
             </div>
             <div className="space-y-4">
               <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Short alert title..." className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:border-blue-600 outline-none font-bold" />
@@ -397,30 +396,6 @@
         </div>
       );
     };
-
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<App />);
-    const input = document.getElementById('imageInput');
-
-input.addEventListener('change', async () => {
-  const file = input.files[0];
-
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('upload_preset', 'YOUR_PRESET');
-
-  const res = await fetch(
-    'https://api.cloudinary.com/v1_1/YOUR_CLOUD_NAME/image/upload',
-    {
-      method: 'POST',
-      body: formData
-    }
-  );
-
-  const data = await res.json();
-  console.log(data.secure_url);
-});
-
   </script>
 </body>
 </html>
