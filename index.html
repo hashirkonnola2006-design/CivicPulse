@@ -1,0 +1,404 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>CivicPulse | Hyperlocal Awareness</title>
+  
+  <!-- Libraries -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f8fafc;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    
+    .leaflet-container { width: 100%; height: 100%; background: #f1f5f9; z-index: 1; }
+    .leaflet-control-zoom { display: none !important; }
+    .custom-div-icon { background: none; border: none; }
+
+    @keyframes slideInRight {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    .animate-slide-in { animation: slideInRight 0.3s ease-out forwards; }
+  </style>
+
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@19.0.0",
+    "react-dom": "https://esm.sh/react-dom@19.0.0",
+    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
+    "lucide-react": "https://esm.sh/lucide-react@0.460.0",
+    "react-leaflet": "https://esm.sh/react-leaflet@4.2.1?external=react,react-dom,leaflet",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "leaflet": "https://esm.sh/leaflet@^1.9.4"
+  }
+}
+</script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" data-type="module">
+    import React, { useState, useMemo, useEffect, useCallback } from 'react';
+    import ReactDOM from 'react-dom/client';
+    import * as Lucide from 'lucide-react';
+    import { MapContainer, TileLayer, Marker, useMapEvents, useMap, Circle } from 'react-leaflet';
+
+    // --- CONSTANTS ---
+    const CATEGORIES = [
+      { id: 'waste', name: 'Waste', icon: 'Trash2', color: 'bg-green-600' },
+      { id: 'sanitation', name: 'Sanitation', icon: 'Droplets', color: 'bg-blue-500' },
+      { id: 'recycling', name: 'Recycling', icon: 'RefreshCw', color: 'bg-emerald-500' },
+      { id: 'dumping', name: 'Illegal Dumping', icon: 'AlertTriangle', color: 'bg-red-500' },
+      { id: 'other', name: 'Other', icon: 'HelpCircle', color: 'bg-gray-500' },
+    ];
+
+    const MOCK_ISSUES = [
+      {
+        id: '1',
+        title: 'Overflowing Plastic Bin near KSRTC',
+        description: 'A critical waste accumulation point near Mavoor Road. Plastic bottles and non-biodegradable bags are blocking the drainage path.',
+        category: 'Waste', area: 'Mavoor Road', status: 'Gaining Attention',
+        supportCount: 64, rewardPoints: 50, isVerified: true,
+        image: 'https://images.unsplash.com/photo-1530587191325-3db32d826c18?auto=format&fit=crop&q=80&w=1200',
+        lat: 11.2600, lng: 75.7850, createdAt: 'Oct 26, 2023', creator: 'CitizenX',
+        comments: [{ id: 'c1', user: 'MalabarRider', text: 'It has been there since Monday.', timestamp: '1h ago' }]
+      },
+      {
+        id: '2',
+        title: 'Beach Plastic Litter',
+        description: 'Massive plastic pollution along the South Beach shoreline following the weekend event.',
+        category: 'Waste', area: 'Kozhikode Beach', status: 'Verified',
+        supportCount: 128, rewardPoints: 100, isVerified: true,
+        image: 'https://images.unsplash.com/photo-1611284446314-60a58ac0deb9?auto=format&fit=crop&q=80&w=1200',
+        lat: 11.2625, lng: 75.7672, createdAt: 'Oct 27, 2023', creator: 'EcoWarrior',
+        comments: []
+      }
+    ];
+
+    // --- UI COMPONENTS ---
+    const Badge = ({ children, variant = 'default' }) => {
+      const styles = {
+        default: 'bg-gray-100 text-gray-700',
+        success: 'bg-green-100 text-green-700',
+        warning: 'bg-orange-100 text-orange-700',
+        info: 'bg-blue-100 text-blue-700',
+      };
+      return <span className={`px-2 py-0.5 rounded-full text-[10px] md:text-xs font-bold ${styles[variant]}`}>{children}</span>;
+    };
+
+    const Button = ({ children, onClick, variant = 'primary', className = '', disabled = false }) => {
+      const base = "px-4 py-2.5 rounded-xl font-bold transition-all active:scale-95 flex items-center justify-center gap-2 text-sm";
+      const variants = {
+        primary: "bg-blue-600 text-white shadow-sm hover:bg-blue-700",
+        secondary: "bg-green-500 text-white shadow-sm hover:bg-green-600",
+        outline: "border border-gray-200 text-gray-700 bg-white hover:bg-gray-50",
+        danger: "bg-red-50 text-red-600 hover:bg-red-100",
+      };
+      return <button disabled={disabled} onClick={onClick} className={`${base} ${variants[variant]} ${className} ${disabled ? 'opacity-50 grayscale' : ''}`}>{children}</button>;
+    };
+
+    // --- SCREENS ---
+
+    const FeedScreen = ({ issues, onIssueClick, onSupport, onActionClick }) => {
+      const [filter, setFilter] = useState('All');
+      const activeIssues = issues.filter(i => i.status !== 'Resolved');
+
+      return (
+        <div className="space-y-8 animate-in fade-in duration-500">
+          <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tighter">Community Feed</h2>
+              <p className="text-slate-500 font-medium">Real-time alerts from your neighborhood.</p>
+            </div>
+            <div className="flex gap-2 overflow-x-auto no-scrollbar py-2">
+              {['All', ...CATEGORIES.map(c => c.name)].map(cat => (
+                <button 
+                  key={cat} onClick={() => setFilter(cat)}
+                  className={`px-5 py-2 rounded-full text-xs font-black whitespace-nowrap transition-all border-2 ${filter === cat ? 'bg-blue-600 border-blue-600 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-400'}`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </header>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 md:gap-8">
+            {activeIssues.filter(i => filter === 'All' || i.category === filter).map(issue => (
+              <div key={issue.id} onClick={() => onIssueClick(issue)} className="bg-white rounded-[32px] overflow-hidden border border-slate-100 shadow-sm hover:shadow-xl transition-all group cursor-pointer flex flex-col">
+                <div className="relative aspect-[4/3] overflow-hidden">
+                  <img src={issue.image} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                  <div className="absolute top-4 left-4 bg-blue-600 text-white px-3 py-1.5 rounded-xl font-black text-[10px] shadow-lg border border-white/20">+{issue.rewardPoints} PTS</div>
+                </div>
+                <div className="p-6 flex flex-col flex-1">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Badge variant="info">{issue.category}</Badge>
+                    <span className="text-[10px] font-bold text-slate-400">{issue.createdAt}</span>
+                  </div>
+                  <h3 className="text-xl font-black text-slate-900 mb-2 leading-tight group-hover:text-blue-600 transition-colors">{issue.title}</h3>
+                  <p className="text-sm text-slate-500 line-clamp-2 mb-6 font-medium">{issue.description}</p>
+                  <div className="mt-auto pt-6 border-t flex justify-between items-center">
+                    <div className="flex gap-4">
+                      <button onClick={(e) => { e.stopPropagation(); onSupport(issue.id); }} className="flex items-center gap-2 text-slate-500 hover:text-blue-600"><Lucide.ThumbsUp size={18} /> <span className="text-sm font-black">{issue.supportCount}</span></button>
+                      <div className="flex items-center gap-2 text-slate-500"><Lucide.MessageSquare size={18} /> <span className="text-sm font-black">{issue.comments.length}</span></div>
+                    </div>
+                    <Badge variant="warning">{issue.status}</Badge>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    };
+
+    const MapScreen = ({ issues, onIssueClick, onStartPost, onActionClick }) => {
+      const [selected, setSelected] = useState(null);
+      const defaultPos = [11.2588, 75.7804];
+      
+      const MapEvents = () => {
+        useMapEvents({ click(e) { onStartPost(e.latlng.lat, e.latlng.lng); } });
+        return null;
+      };
+
+      const createIcon = (cat, status) => L.divIcon({
+        className: 'custom-div-icon',
+        html: `<div class="w-10 h-10 ${status === 'Resolved' ? 'bg-green-600' : 'bg-blue-600'} rounded-2xl border-4 border-white shadow-xl flex items-center justify-center text-white"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg></div>`,
+        iconSize: [40, 40], iconAnchor: [20, 20]
+      });
+
+      return (
+        <div className="h-full relative overflow-hidden">
+          <MapContainer center={defaultPos} zoom={14} className="h-full w-full">
+            <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
+            <MapEvents />
+            {issues.map(issue => (
+              <Marker 
+                key={issue.id} 
+                position={[issue.lat, issue.lng]} 
+                icon={createIcon(issue.category, issue.status)}
+                eventHandlers={{ click: () => setSelected(issue) }}
+              />
+            ))}
+          </MapContainer>
+          {selected && (
+            <div className="absolute bottom-6 left-6 right-6 md:left-auto md:w-96 z-[1000] bg-white rounded-[32px] shadow-2xl border border-slate-100 overflow-hidden animate-slide-in">
+              <div className="relative h-40">
+                <img src={selected.image} className="w-full h-full object-cover" />
+                <button onClick={() => setSelected(null)} className="absolute top-3 right-3 p-2 bg-white/80 rounded-full"><Lucide.X size={16} /></button>
+              </div>
+              <div className="p-6">
+                <h3 className="text-xl font-black mb-1">{selected.title}</h3>
+                <p className="text-xs text-slate-400 font-bold uppercase mb-4">{selected.area}</p>
+                <div className="flex gap-3">
+                  <Button onClick={() => onIssueClick(selected)} className="flex-1">View Full Details</Button>
+                  <Button variant="outline" onClick={() => onActionClick("Shared link to map location")}><Lucide.Share2 size={18} /></Button>
+                </div>
+              </div>
+            </div>
+          )}
+          <div className="absolute top-6 left-6 z-[1000] bg-white p-4 rounded-2xl shadow-xl border md:flex hidden items-center gap-4">
+            <Lucide.Info className="text-blue-600" size={20} />
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Tap anywhere on map to report a new issue</p>
+          </div>
+        </div>
+      );
+    };
+
+    const IssueDetailScreen = ({ issue, onBack, onSupport, onResolve, onCloseResolution }) => {
+      const [showProof, setShowProof] = useState(false);
+      
+      return (
+        <div className="h-full bg-white flex flex-col animate-in slide-in-from-right duration-300 relative overflow-hidden">
+          <div className="h-64 md:h-96 relative shrink-0">
+            <img src={issue.image} className="w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
+            <button onClick={onBack} className="absolute top-6 left-6 p-3 bg-white/90 rounded-2xl shadow-xl"><Lucide.ArrowLeft size={20} /></button>
+            <div className="absolute bottom-8 left-8 right-8">
+              <Badge variant="info">{issue.status}</Badge>
+              <h2 className="text-3xl md:text-5xl font-black text-white mt-2 leading-tight">{issue.title}</h2>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto p-8 md:p-12 space-y-10 no-scrollbar pb-32">
+            <section>
+              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">The Context</h4>
+              <p className="text-lg text-slate-600 font-medium leading-relaxed">{issue.description}</p>
+            </section>
+            <section className="bg-slate-50 p-6 rounded-[32px] border border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="bg-blue-600 p-3 rounded-xl text-white"><Lucide.MapPin size={24} /></div>
+                <div><h5 className="font-black text-slate-900">{issue.area}</h5><p className="text-xs text-slate-400">Neighborhood Hotspot</p></div>
+              </div>
+              <Lucide.ChevronRight className="text-slate-300" />
+            </section>
+            {issue.status !== 'Resolved' && (
+              <section className="bg-blue-600 p-8 rounded-[40px] text-white shadow-2xl shadow-blue-100">
+                <h4 className="text-xl font-black mb-2">Be a Local Hero</h4>
+                <p className="text-blue-100 mb-8 font-medium">Earn +{issue.rewardPoints * 2} community points by resolving this.</p>
+                <Button onClick={() => setShowProof(true)} className="w-full bg-white text-blue-600 py-4 rounded-[24px]">Complete Mission</Button>
+              </section>
+            )}
+          </div>
+          {showProof && (
+            <div className="fixed inset-0 z-[2000] bg-black/60 backdrop-blur-md flex items-end justify-center">
+              <div className="bg-white w-full max-w-2xl rounded-t-[48px] p-10 flex flex-col gap-8 animate-in slide-in-from-bottom duration-500">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-2xl font-black">Submit Proof</h3>
+                  <button onClick={() => { setShowProof(false); onCloseResolution(); }} className="p-2"><Lucide.X size={24} /></button>
+                </div>
+                <div className="h-48 border-4 border-dashed rounded-[32px] flex flex-col items-center justify-center text-slate-300 gap-2 bg-slate-50">
+                  <Lucide.Video size={48} />
+                  <span className="text-xs font-black uppercase">Click to Select Video</span>
+                </div>
+                <Button onClick={() => { onResolve(issue.id, ""); setShowProof(false); onCloseResolution(); }} className="w-full py-5 text-xl font-black">Confirm Resolution</Button>
+              </div>
+            </div>
+          )}
+          <div className="absolute bottom-0 left-0 right-0 p-8 bg-white/95 backdrop-blur-md border-t flex gap-4 pb-12">
+            <Button onClick={() => onSupport(issue.id)} className="flex-1 py-4 text-lg">Support Alert</Button>
+            <Button variant="outline" className="px-6"><Lucide.Share2 size={24} /></Button>
+          </div>
+        </div>
+      );
+    };
+
+    const PostScreen = ({ onPost, initialCoords }) => {
+      const [title, setTitle] = useState('');
+      const [category, setCategory] = useState('');
+      return (
+        <div className="h-full bg-white rounded-[48px] shadow-2xl overflow-hidden flex flex-col border max-w-3xl mx-auto">
+          <header className="p-8 border-b bg-slate-50 flex justify-between items-center">
+            <h2 className="text-2xl font-black">Raise New Alert</h2>
+            <Lucide.ShieldAlert className="text-blue-600" size={32} />
+          </header>
+          <div className="flex-1 overflow-y-auto p-8 space-y-8">
+            <div className="h-48 bg-slate-100 rounded-[32px] border-4 border-dashed flex flex-col items-center justify-center text-slate-400 gap-2">
+              <Lucide.Camera size={48} />
+              <span className="text-xs font-black uppercase">Add Photo Evidence</span>
+            </div>
+            <div className="space-y-4">
+              <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Short alert title..." className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:border-blue-600 outline-none font-bold" />
+              <div className="flex flex-wrap gap-2">
+                {CATEGORIES.map(c => (
+                  <button key={c.id} onClick={() => setCategory(c.name)} className={`px-4 py-2 rounded-full text-xs font-black transition-all ${category === c.name ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-400'}`}>{c.name}</button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="p-8 border-t flex gap-4">
+            <Button onClick={() => onPost({ id: Math.random().toString(), title, category, image: 'https://images.unsplash.com/photo-1528190336454-13cd56b45b5a?auto=format&fit=crop&w=600', supportCount: 0, comments: [], status: 'Reported', rewardPoints: 50, lat: initialCoords?.lat || 11.2, lng: initialCoords?.lng || 75.8, area: 'Custom Loc' })} disabled={!title || !category} className="flex-1 py-4 text-lg">Post to Neighborhood</Button>
+          </div>
+        </div>
+      );
+    };
+
+    // --- MAIN APP ---
+    const App = () => {
+      const [tab, setTab] = useState('feed');
+      const [issues, setIssues] = useState(MOCK_ISSUES);
+      const [selected, setSelected] = useState(null);
+      const [toast, setToast] = useState(null);
+      const [prefilled, setPrefilled] = useState(null);
+
+      const showToast = (message, type = 'info') => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 3000);
+      };
+
+      const handleSupport = (id) => {
+        setIssues(prev => prev.map(i => i.id === id ? { ...i, supportCount: i.supportCount + 1 } : i));
+        showToast("Boost successful!", "success");
+      };
+
+      const handleResolve = (id) => {
+        setIssues(prev => prev.map(i => i.id === id ? { ...i, status: 'Resolved' } : i));
+        showToast("Mission accomplished!", "success");
+      };
+
+      return (
+        <div className="flex h-screen bg-slate-50 overflow-hidden">
+          {/* Toast */}
+          {toast && (
+            <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-[3000] px-6 py-3 rounded-2xl shadow-2xl border text-white font-black animate-in slide-in-from-top duration-300 ${toast.type === 'success' ? 'bg-green-600 border-green-500' : 'bg-slate-900 border-slate-700'}`}>
+              {toast.message}
+            </div>
+          )}
+
+          {/* Sidebar (Desktop) */}
+          <aside className="hidden lg:flex flex-col w-72 bg-white border-r p-10 shrink-0">
+            <div className="flex items-center gap-4 mb-12">
+              <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white"><Lucide.ShieldAlert size={24} /></div>
+              <h1 className="text-2xl font-black tracking-tighter">CivicPulse</h1>
+            </div>
+            <nav className="space-y-2 flex-1">
+              {['feed', 'map', 'leaderboard', 'profile'].map(t => (
+                <button key={t} onClick={() => { setTab(t); setSelected(null); }} className={`w-full flex items-center gap-4 px-6 py-3.5 rounded-2xl font-black capitalize transition-all ${tab === t ? 'bg-blue-600 text-white shadow-xl' : 'text-slate-400 hover:bg-slate-50'}`}>
+                  {t === 'feed' && <Lucide.Home size={20} />}
+                  {t === 'map' && <Lucide.MapIcon size={20} />}
+                  {t === 'leaderboard' && <Lucide.Trophy size={20} />}
+                  {t === 'profile' && <Lucide.User size={20} />}
+                  {t}
+                </button>
+              ))}
+            </nav>
+            <Button onClick={() => setTab('post')} className="py-4 mt-8"><Lucide.PlusCircle size={20} /> Raise Issue</Button>
+          </aside>
+
+          {/* Main Container */}
+          <div className="flex-1 flex flex-col relative overflow-hidden">
+            {/* Mobile Header */}
+            <header className="lg:hidden h-16 bg-white border-b px-6 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3"><Lucide.ShieldAlert className="text-blue-600" /><h1 className="text-xl font-black tracking-tighter">CivicPulse</h1></div>
+              <Lucide.Bell className="text-slate-400" />
+            </header>
+
+            <main className="flex-1 overflow-y-auto relative no-scrollbar bg-slate-50/50">
+              {selected ? (
+                <div className="max-w-4xl mx-auto h-full md:p-6"><IssueDetailScreen issue={selected} onBack={() => setSelected(null)} onSupport={handleSupport} onResolve={handleResolve} onCloseResolution={() => { setTab('feed'); setSelected(null); }} /></div>
+              ) : (
+                <div className="max-w-7xl mx-auto p-4 md:p-8">
+                  {tab === 'feed' && <FeedScreen issues={issues} onIssueClick={setSelected} onSupport={handleSupport} onActionClick={showToast} />}
+                  {tab === 'map' && <div className="h-[calc(100vh-180px)]"><MapScreen issues={issues} onIssueClick={setSelected} onStartPost={(lat, lng) => { setPrefilled({lat, lng}); setTab('post'); }} onActionClick={showToast} /></div>}
+                  {tab === 'post' && <PostScreen initialCoords={prefilled} onPost={(i) => { setIssues([i, ...issues]); setTab('feed'); showToast("Report successful!", "success"); setPrefilled(null); }} />}
+                  {tab === 'leaderboard' && <div className="text-center py-20"><Lucide.Trophy size={64} className="mx-auto text-yellow-500 mb-6" /><h2 className="text-3xl font-black">Coming Soon</h2><p className="text-slate-500">Global community rankings are being calculated.</p></div>}
+                  {tab === 'profile' && <div className="max-w-xl mx-auto text-center py-20"><div className="w-24 h-24 bg-blue-600 text-white rounded-[32px] flex items-center justify-center text-3xl font-black mx-auto mb-6">CP</div><h2 className="text-3xl font-black">CitizenPulse #4021</h2><p className="text-slate-500">Kozhikode, Kerala</p></div>}
+                </div>
+              )}
+            </main>
+
+            {/* Mobile Nav */}
+            {!selected && (
+              <nav className="lg:hidden h-20 bg-white border-t flex items-center justify-around shrink-0 pb-safe">
+                <button onClick={() => setTab('feed')} className={`flex flex-col items-center gap-1 ${tab === 'feed' ? 'text-blue-600' : 'text-slate-300'}`}><Lucide.Home size={22} /><span className="text-[9px] font-black uppercase">Feed</span></button>
+                <button onClick={() => setTab('map')} className={`flex flex-col items-center gap-1 ${tab === 'map' ? 'text-blue-600' : 'text-slate-300'}`}><Lucide.MapIcon size={22} /><span className="text-[9px] font-black uppercase">Map</span></button>
+                <button onClick={() => setTab('post')} className="w-14 h-14 bg-blue-600 text-white rounded-2xl shadow-xl -mt-8 border-4 border-white flex items-center justify-center"><Lucide.Plus size={32} /></button>
+                <button onClick={() => setTab('leaderboard')} className={`flex flex-col items-center gap-1 ${tab === 'leaderboard' ? 'text-blue-600' : 'text-slate-300'}`}><Lucide.Trophy size={22} /><span className="text-[9px] font-black uppercase">Ranks</span></button>
+                <button onClick={() => setTab('profile')} className={`flex flex-col items-center gap-1 ${tab === 'profile' ? 'text-blue-600' : 'text-slate-300'}`}><Lucide.User size={22} /><span className="text-[9px] font-black uppercase">Me</span></button>
+              </nav>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
