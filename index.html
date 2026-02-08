@@ -422,6 +422,24 @@
       const [description, setDescription] = useState('');
       const [category, setCategory] = useState('');
       const [postType, setPostType] = useState('Issue');
+      const [image, setImage] = useState(null);
+      const fileInputRef = useRef(null);
+
+      const handleImageUpload = (event) => {
+        const file = event.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            setImage(reader.result);
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+
+      const triggerUpload = () => {
+        fileInputRef.current.click();
+      };
+
       return (
         <div className="h-full bg-white rounded-[48px] shadow-2xl overflow-hidden flex flex-col border max-w-3xl mx-auto w-full">
           <header className="p-8 border-b bg-slate-50 flex justify-between items-center">
@@ -435,7 +453,28 @@
             </div>
           </header>
           <div className="flex-1 p-8 space-y-8 overflow-y-auto no-scrollbar">
-            <div className="h-48 bg-slate-100 rounded-[32px] border-4 border-dashed flex flex-col items-center justify-center text-slate-400 shrink-0"><Lucide.Camera size={48} /><span className="text-xs font-black uppercase mt-2">Add Proof Photo</span></div>
+            {/* Image Upload Area */}
+            <div 
+              onClick={triggerUpload}
+              className="h-48 bg-slate-100 rounded-[32px] border-4 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 shrink-0 cursor-pointer overflow-hidden hover:bg-slate-200 transition-colors"
+            >
+              {image ? (
+                <img src={image} className="w-full h-full object-cover" alt="Upload Preview" />
+              ) : (
+                <>
+                  <Lucide.Camera size={48} />
+                  <span className="text-xs font-black uppercase mt-2">Add Proof Photo</span>
+                </>
+              )}
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleImageUpload} 
+                className="hidden" 
+                accept="image/*"
+              />
+            </div>
+
             <div>
               <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Title</label>
               <input value={title} onChange={e => setTitle(e.target.value)} placeholder={`e.g. ${postType === 'Issue' ? "Broken pipe" : "New park idea"}`} className="w-full p-4 bg-slate-50 rounded-2xl focus:ring-2 ring-blue-600 outline-none font-bold" />
@@ -459,7 +498,7 @@
               </div>
             </div>
           </div>
-          <div className="p-8 border-t"><Button onClick={() => onPost({ id: Math.random().toString(), type: postType.toLowerCase(), title, description, category, image: 'https://images.unsplash.com/photo-1528190336454-13cd56b45b5a?auto=format&fit=crop&w=600', supportCount: 0, comments: [], status: 'Reported', rewardPoints: 50, lat: initialCoords?.lat || 11.25, lng: initialCoords?.lng || 75.78, area: 'Current Area', createdAt: 'Today', creator: CURRENT_USER.name })} disabled={!title || !category} className="w-full py-5 text-lg">Post to Neighborhood</Button></div>
+          <div className="p-8 border-t"><Button onClick={() => onPost({ id: Math.random().toString(), type: postType.toLowerCase(), title, description, category, image: image || 'https://images.unsplash.com/photo-1528190336454-13cd56b45b5a?auto=format&fit=crop&w=600', supportCount: 0, comments: [], status: 'Reported', rewardPoints: 50, lat: initialCoords?.lat || 11.25, lng: initialCoords?.lng || 75.78, area: 'Current Area', createdAt: 'Today', creator: CURRENT_USER.name })} disabled={!title || !category} className="w-full py-5 text-lg">Post to Neighborhood</Button></div>
         </div>
       );
     };
