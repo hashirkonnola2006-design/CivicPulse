@@ -5,62 +5,59 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>CivicPulse | Hyperlocal Awareness</title>
-  
-  <!-- Libraries -->
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <!-- Babel for standalone JSX support -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <script type="importmap">
+  {
+    "imports": {
+      "react": "https://esm.sh/react@^19.2.4",
+      "react-dom": "https://esm.sh/react-dom@^19.2.4",
+      "react-dom/client": "https://esm.sh/react-dom@^19.2.4/client",
+      "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
+      "leaflet": "https://esm.sh/leaflet@^1.9.4",
+      "react-leaflet": "https://esm.sh/react-leaflet@^5.0.0"
+    }
+  }
+  </script>
 
   <style>
     body {
       font-family: 'Inter', sans-serif;
       background-color: #f8fafc;
       -webkit-tap-highlight-color: transparent;
+      overflow: hidden;
     }
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-    
     .leaflet-container { width: 100%; height: 100%; background: #f1f5f9; z-index: 1; }
     .leaflet-control-zoom { display: none !important; }
     .custom-div-icon { background: none; border: none; }
-
     @keyframes slideInRight {
       from { transform: translateX(100%); opacity: 0; }
       to { transform: translateX(0); opacity: 1; }
     }
     .animate-slide-in { animation: slideInRight 0.3s ease-out forwards; }
+    .glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); }
   </style>
-
-  <script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@19.0.0",
-    "react-dom": "https://esm.sh/react-dom@19.0.0",
-    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
-    "lucide-react": "https://esm.sh/lucide-react@0.460.0",
-    "react-leaflet": "https://esm.sh/react-leaflet@4.2.1?external=react,react-dom,leaflet",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
-    "react/": "https://esm.sh/react@^19.2.4/",
-    "leaflet": "https://esm.sh/leaflet@^1.9.4"
-  }
-}
-</script>
 </head>
 <body>
   <div id="root"></div>
 
   <script type="text/babel" data-type="module">
-    import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+    import React, { useState, useMemo, useRef, useEffect } from 'react';
     import ReactDOM from 'react-dom/client';
     import * as Lucide from 'lucide-react';
-    import { MapContainer, TileLayer, Marker, useMapEvents, useMap, Circle } from 'react-leaflet';
+    import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+    import L from 'leaflet';
 
-    // --- CONSTANTS ---
+    // --- TYPES & CONSTANTS ---
     const CATEGORIES = [
       { id: 'waste', name: 'Waste', icon: 'Trash2', color: 'bg-green-600' },
       { id: 'sanitation', name: 'Sanitation', icon: 'Droplets', color: 'bg-blue-500' },
@@ -78,7 +75,7 @@
         category: 'Waste', area: 'Mavoor Road', status: 'Gaining Attention',
         supportCount: 64, rewardPoints: 50, isVerified: true,
         image: 'https://images.unsplash.com/photo-1530587191325-3db32d826c18?auto=format&fit=crop&q=80&w=1200',
-        lat: 11.2600, lng: 75.7850, createdAt: 'Oct 26, 2023', creator: 'CitizenX',
+        lat: 11.2600, lng: 75.7850, createdAt: 'Oct 26, 2023', creator: 'CitizenPulse #4021',
         comments: [{ id: 'c1', user: 'MalabarRider', text: 'It has been there since Monday.', timestamp: '1h ago' }]
       },
       {
@@ -102,19 +99,27 @@
         image: 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?auto=format&fit=crop&q=80&w=1200',
         lat: 11.2530, lng: 75.7820, createdAt: '2 days ago', creator: 'SolarFan',
         comments: []
-      },
-      {
-        id: 's2',
-        type: 'suggestion',
-        title: 'Community Composting Unit',
-        description: 'Suggestion to install a solar-powered composting unit in Ward 4 to reduce organic waste transport and create local fertilizer.',
-        category: 'Recycling', area: 'Civil Station', status: 'Proposed',
-        supportCount: 89, rewardPoints: 40, isVerified: true,
-        image: 'https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?auto=format&fit=crop&q=80&w=1200',
-        lat: 11.2750, lng: 75.7950, createdAt: '1 day ago', creator: 'GreenCalicut',
-        comments: []
       }
     ];
+
+    const MOCK_LEADERBOARD = [
+      { id: 'u1', name: 'EcoWarrior', points: 2450, reports: 42, resolutions: 18, location: 'Kozhikode', avatar: 'https://picsum.photos/seed/u1/100', rank: 1 },
+      { id: 'u2', name: 'GreenCalicut', points: 1820, reports: 35, resolutions: 12, location: 'Mavoor Road', avatar: 'https://picsum.photos/seed/u2/100', rank: 2 },
+      { id: 'u3', name: 'MalabarRider', points: 1640, reports: 28, resolutions: 15, location: 'Beach Road', avatar: 'https://picsum.photos/seed/u3/100', rank: 3 },
+      { id: 'u4', name: 'CitizenX', points: 1200, reports: 20, resolutions: 8, location: 'Civil Station', avatar: 'https://picsum.photos/seed/u4/100', rank: 4 },
+      { id: 'u5', name: 'SolarFan', points: 950, reports: 15, resolutions: 5, location: 'S.M. Street', avatar: 'https://picsum.photos/seed/u5/100', rank: 5 },
+    ];
+
+    const CURRENT_USER = {
+      id: 'me',
+      name: 'CitizenPulse #4021',
+      points: 450,
+      reports: 12,
+      resolutions: 4,
+      location: 'Kozhikode, Kerala',
+      avatar: 'https://picsum.photos/seed/me/100',
+      rank: 12
+    };
 
     // --- UI COMPONENTS ---
     const Badge = ({ children, variant = 'default' }) => {
@@ -124,7 +129,7 @@
         warning: 'bg-orange-100 text-orange-700',
         info: 'bg-blue-100 text-blue-700',
       };
-      return <span className={`px-2 py-0.5 rounded-full text-[10px] md:text-xs font-bold ${styles[variant]}`}>{children}</span>;
+      return <span className={`px-2 py-0.5 rounded-full text-[10px] md:text-xs font-bold ${styles[variant] || styles.default}`}>{children}</span>;
     };
 
     const Button = ({ children, onClick, variant = 'primary', className = '', disabled = false }) => {
@@ -135,30 +140,20 @@
         outline: "border border-gray-200 text-gray-700 bg-white hover:bg-gray-50",
         danger: "bg-red-50 text-red-600 hover:bg-red-100",
       };
-      return <button disabled={disabled} onClick={onClick} className={`${base} ${variants[variant]} ${className} ${disabled ? 'opacity-50 grayscale' : ''}`}>{children}</button>;
+      return <button disabled={disabled} onClick={onClick} className={`${base} ${variants[variant] || variants.primary} ${className} ${disabled ? 'opacity-50 grayscale' : ''}`}>{children}</button>;
     };
 
     // --- SCREENS ---
-
-    const FeedScreen = ({ issues, onIssueClick, onSupport, onActionClick }) => {
+    const FeedScreen = ({ issues, onIssueClick, onSupport }) => {
       const [filter, setFilter] = useState('All');
-      const [feedView, setFeedView] = useState('Issues'); // Issues | Suggestions | Trending
+      const [feedView, setFeedView] = useState('Issues');
       
       const filteredContent = useMemo(() => {
         let list = issues.filter(i => i.status !== 'Resolved');
-        
-        if (feedView === 'Issues') {
-          list = list.filter(i => i.type === 'issue');
-        } else if (feedView === 'Suggestions') {
-          list = list.filter(i => i.type === 'suggestion');
-        } else if (feedView === 'Trending') {
-          list = [...list].sort((a, b) => b.supportCount - a.supportCount);
-        }
-
-        if (filter !== 'All') {
-          list = list.filter(i => i.category === filter);
-        }
-        
+        if (feedView === 'Issues') list = list.filter(i => i.type === 'issue');
+        else if (feedView === 'Suggestions') list = list.filter(i => i.type === 'suggestion');
+        else if (feedView === 'Trending') list = [...list].sort((a, b) => b.supportCount - a.supportCount);
+        if (filter !== 'All') list = list.filter(i => i.category === filter);
         return list;
       }, [issues, feedView, filter]);
 
@@ -169,11 +164,7 @@
               <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tighter">Community Feed</h2>
               <div className="flex gap-4 mt-2">
                 {['Issues', 'Suggestions', 'Trending'].map(v => (
-                  <button 
-                    key={v} 
-                    onClick={() => setFeedView(v)}
-                    className={`text-sm font-bold transition-all relative pb-1 ${feedView === v ? 'text-blue-600' : 'text-slate-400'}`}
-                  >
+                  <button key={v} onClick={() => setFeedView(v)} className={`text-sm font-bold transition-all relative pb-1 ${feedView === v ? 'text-blue-600' : 'text-slate-400'}`}>
                     {v}
                     {feedView === v && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-full" />}
                   </button>
@@ -182,23 +173,17 @@
             </div>
             <div className="flex gap-2 overflow-x-auto no-scrollbar py-2">
               {['All', ...CATEGORIES.map(c => c.name)].map(cat => (
-                <button 
-                  key={cat} onClick={() => setFilter(cat)}
-                  className={`px-5 py-2 rounded-full text-xs font-black whitespace-nowrap transition-all border-2 ${filter === cat ? 'bg-blue-600 border-blue-600 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-400'}`}
-                >
+                <button key={cat} onClick={() => setFilter(cat)} className={`px-5 py-2 rounded-full text-xs font-black whitespace-nowrap transition-all border-2 ${filter === cat ? 'bg-blue-600 border-blue-600 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-400'}`}>
                   {cat}
                 </button>
               ))}
             </div>
           </header>
-
           {filteredContent.length === 0 ? (
             <div className="py-20 text-center">
-              <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300">
-                <Lucide.Inbox size={40} />
-              </div>
+              <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300"><Lucide.Inbox size={40} /></div>
               <h3 className="text-xl font-bold text-slate-900">No {feedView.toLowerCase()} found</h3>
-              <p className="text-slate-500">Be the first to raise one in this category!</p>
+              <p className="text-slate-500">Be the first to raise one!</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 md:gap-8">
@@ -207,11 +192,7 @@
                   <div className="relative aspect-[4/3] overflow-hidden">
                     <img src={item.image} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                     <div className="absolute top-4 left-4 bg-blue-600 text-white px-3 py-1.5 rounded-xl font-black text-[10px] shadow-lg border border-white/20">+{item.rewardPoints} PTS</div>
-                    {item.type === 'suggestion' && (
-                      <div className="absolute top-4 right-4 bg-green-500 text-white p-1.5 rounded-lg shadow-lg">
-                        <Lucide.Lightbulb size={14} />
-                      </div>
-                    )}
+                    {item.type === 'suggestion' && <div className="absolute top-4 right-4 bg-green-500 text-white p-1.5 rounded-lg shadow-lg"><Lucide.Lightbulb size={14} /></div>}
                   </div>
                   <div className="p-6 flex flex-col flex-1">
                     <div className="flex items-center gap-2 mb-3">
@@ -247,7 +228,7 @@
 
       const createIcon = (item) => L.divIcon({
         className: 'custom-div-icon',
-        html: `<div class="w-10 h-10 ${item.type === 'suggestion' ? 'bg-green-500' : 'bg-blue-600'} rounded-2xl border-4 border-white shadow-xl flex items-center justify-center text-white"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg></div>`,
+        html: `<div class="w-10 h-10 ${item.type === 'suggestion' ? 'bg-green-500' : 'bg-blue-600'} rounded-2xl border-4 border-white shadow-xl flex items-center justify-center text-white"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg></div>`,
         iconSize: [40, 40], iconAnchor: [20, 20]
       });
 
@@ -276,79 +257,161 @@
                 <p className="text-xs text-slate-400 font-bold uppercase mb-4">{selected.area}</p>
                 <div className="flex gap-3">
                   <Button onClick={() => onIssueClick(selected)} className="flex-1">View Full Details</Button>
-                  <Button variant="outline" onClick={() => onActionClick("Shared link to map location")}><Lucide.Share2 size={18} /></Button>
+                  <Button variant="outline" onClick={() => onActionClick("Shared location")}><Lucide.Share2 size={18} /></Button>
                 </div>
               </div>
             </div>
           )}
-          <div className="absolute top-6 left-6 z-[1000] bg-white p-4 rounded-2xl shadow-xl border md:flex hidden items-center gap-4">
-            <Lucide.Info className="text-blue-600" size={20} />
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Tap anywhere on map to report a new issue or suggestion</p>
+        </div>
+      );
+    };
+
+    const LeaderboardScreen = ({ leaderboard }) => {
+      const topThree = leaderboard.slice(0, 3);
+      const others = leaderboard.slice(3);
+
+      return (
+        <div className="max-w-4xl mx-auto space-y-12 animate-in fade-in duration-700">
+          <header className="text-center">
+            <h2 className="text-4xl font-black tracking-tighter text-slate-900 mb-2">Community Champions</h2>
+            <p className="text-slate-500 font-medium">Leading the change in our neighborhood.</p>
+          </header>
+
+          <div className="grid grid-cols-3 gap-4 items-end pt-10 px-4">
+            {/* Podium Silver */}
+            <div className="flex flex-col items-center">
+              <div className="relative mb-4 group">
+                 <div className="w-16 h-16 md:w-24 md:h-24 rounded-[24px] overflow-hidden border-4 border-slate-200 shadow-xl">
+                   <img src={topThree[1].avatar} className="w-full h-full object-cover" />
+                 </div>
+                 <div className="absolute -bottom-2 -right-2 bg-slate-400 text-white w-8 h-8 rounded-full flex items-center justify-center font-black border-4 border-white">2</div>
+              </div>
+              <p className="font-black text-slate-900 text-sm">{topThree[1].name}</p>
+              <p className="text-[10px] font-bold text-blue-600">{topThree[1].points} PTS</p>
+            </div>
+
+            {/* Podium Gold */}
+            <div className="flex flex-col items-center">
+              <div className="relative mb-6 group">
+                 <div className="w-20 h-20 md:w-32 md:h-32 rounded-[32px] overflow-hidden border-4 border-yellow-400 shadow-2xl">
+                   <img src={topThree[0].avatar} className="w-full h-full object-cover" />
+                 </div>
+                 <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-yellow-500 animate-bounce"><Lucide.Crown size={32} /></div>
+                 <div className="absolute -bottom-3 -right-3 bg-yellow-400 text-white w-10 h-10 rounded-full flex items-center justify-center font-black border-4 border-white text-lg">1</div>
+              </div>
+              <p className="font-black text-slate-900 text-base md:text-xl">{topThree[0].name}</p>
+              <p className="text-xs font-bold text-blue-600">{topThree[0].points} PTS</p>
+            </div>
+
+            {/* Podium Bronze */}
+            <div className="flex flex-col items-center">
+              <div className="relative mb-4 group">
+                 <div className="w-16 h-16 md:w-24 md:h-24 rounded-[24px] overflow-hidden border-4 border-amber-600 shadow-xl">
+                   <img src={topThree[2].avatar} className="w-full h-full object-cover" />
+                 </div>
+                 <div className="absolute -bottom-2 -right-2 bg-amber-600 text-white w-8 h-8 rounded-full flex items-center justify-center font-black border-4 border-white">3</div>
+              </div>
+              <p className="font-black text-slate-900 text-sm">{topThree[2].name}</p>
+              <p className="text-[10px] font-bold text-blue-600">{topThree[2].points} PTS</p>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-[40px] shadow-sm border border-slate-100 overflow-hidden divide-y divide-slate-50">
+            {others.map((user, idx) => (
+              <div key={user.id} className="p-6 flex items-center gap-6 hover:bg-slate-50 transition-colors">
+                <span className="w-8 font-black text-slate-300 text-lg">#{idx + 4}</span>
+                <img src={user.avatar} className="w-12 h-12 rounded-2xl object-cover shadow-sm" />
+                <div className="flex-1">
+                  <h4 className="font-black text-slate-900">{user.name}</h4>
+                  <p className="text-xs text-slate-400 font-bold uppercase">{user.location}</p>
+                </div>
+                <div className="text-right">
+                  <span className="block font-black text-blue-600">{user.points}</span>
+                  <span className="text-[10px] font-bold text-slate-300 uppercase">Points</span>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       );
     };
 
-    const IssueDetailScreen = ({ issue, onBack, onSupport, onResolve, onCloseResolution }) => {
-      const [showProof, setShowProof] = useState(false);
+    const ProfileScreen = ({ user, myIssues }) => {
+      const [activeTab, setActiveTab] = useState('activity');
+      return (
+        <div className="max-w-4xl mx-auto space-y-10 animate-in slide-in-from-bottom duration-700">
+          <div className="bg-white rounded-[48px] shadow-sm border border-slate-100 p-8 md:p-12 relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-12 opacity-5"><Lucide.ShieldCheck size={200} /></div>
+            <div className="flex flex-col md:flex-row items-center gap-10 relative z-10">
+              <div className="w-32 h-32 md:w-44 md:h-44 rounded-[48px] overflow-hidden border-8 border-slate-50 shadow-2xl">
+                <img src={user.avatar} className="w-full h-full object-cover" />
+              </div>
+              <div className="flex-1 text-center md:text-left">
+                <h2 className="text-4xl font-black tracking-tighter text-slate-900 mb-2">{user.name}</h2>
+                <Badge variant="info">Level 4 Active Citizen</Badge>
+                <div className="grid grid-cols-3 gap-4 mt-8">
+                  <div className="bg-slate-50 p-4 rounded-3xl text-center">
+                    <p className="text-xs font-black text-slate-400 uppercase">Points</p>
+                    <p className="text-xl font-black text-blue-600">{user.points}</p>
+                  </div>
+                  <div className="bg-slate-50 p-4 rounded-3xl text-center">
+                    <p className="text-xs font-black text-slate-400 uppercase">Reports</p>
+                    <p className="text-xl font-black text-slate-900">{user.reports}</p>
+                  </div>
+                  <div className="bg-slate-50 p-4 rounded-3xl text-center">
+                    <p className="text-xs font-black text-slate-400 uppercase">Impact</p>
+                    <p className="text-xl font-black text-green-600">{user.resolutions}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-4">
+            {['activity', 'badges'].map(t => (
+              <button key={t} onClick={() => setActiveTab(t)} className={`px-8 py-3 rounded-2xl font-black text-sm transition-all ${activeTab === t ? 'bg-slate-900 text-white' : 'bg-white text-slate-400 border'}`}>
+                {t === 'activity' ? 'My Activity' : 'Badges'}
+              </button>
+            ))}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {activeTab === 'activity' ? myIssues.map(item => (
+              <div key={item.id} className="bg-white p-6 rounded-[32px] border flex gap-6">
+                <img src={item.image} className="w-20 h-20 rounded-2xl object-cover" />
+                <div>
+                  <h4 className="font-black text-slate-900">{item.title}</h4>
+                  <Badge variant="info">{item.status}</Badge>
+                </div>
+              </div>
+            )) : <div className="col-span-full py-20 bg-white rounded-[40px] text-center text-slate-400 font-bold uppercase tracking-widest">Achievements unlocked on community action.</div>}
+          </div>
+        </div>
+      );
+    };
+
+    const IssueDetailScreen = ({ issue, onBack, onSupport, onResolve }) => {
       const isSuggestion = issue.type === 'suggestion';
-      
       return (
         <div className="h-full bg-white flex flex-col animate-in slide-in-from-right duration-300 relative overflow-hidden">
           <div className="h-64 md:h-96 relative shrink-0">
             <img src={issue.image} className="w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
             <button onClick={onBack} className="absolute top-6 left-6 p-3 bg-white/90 rounded-2xl shadow-xl"><Lucide.ArrowLeft size={20} /></button>
             <div className="absolute bottom-8 left-8 right-8">
               <Badge variant={isSuggestion ? 'success' : 'info'}>{issue.status}</Badge>
-              <h2 className="text-3xl md:text-5xl font-black text-white mt-2 leading-tight">{issue.title}</h2>
+              <h2 className="text-3xl md:text-5xl font-black text-white mt-2 leading-tight drop-shadow-lg">{issue.title}</h2>
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto p-8 md:p-12 space-y-10 no-scrollbar pb-32">
-            <section>
-              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">{isSuggestion ? 'The Proposal' : 'The Context'}</h4>
-              <p className="text-lg text-slate-600 font-medium leading-relaxed">{issue.description}</p>
-            </section>
-            <section className="bg-slate-50 p-6 rounded-[32px] border border-slate-100 flex items-center justify-between">
+          <div className="flex-1 overflow-y-auto p-8 md:p-12 space-y-10 pb-32">
+            <p className="text-lg text-slate-600 font-medium leading-relaxed">{issue.description}</p>
+            <div className="bg-slate-50 p-6 rounded-[32px] flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className={`${isSuggestion ? 'bg-green-600' : 'bg-blue-600'} p-3 rounded-xl text-white`}><Lucide.MapPin size={24} /></div>
+                <Lucide.MapPin className="text-blue-600" />
                 <div><h5 className="font-black text-slate-900">{issue.area}</h5><p className="text-xs text-slate-400">Neighborhood Hotspot</p></div>
               </div>
-              <Lucide.ChevronRight className="text-slate-300" />
-            </section>
-            {!isSuggestion && issue.status !== 'Resolved' && (
-              <section className="bg-blue-600 p-8 rounded-[40px] text-white shadow-2xl shadow-blue-100">
-                <h4 className="text-xl font-black mb-2">Be a Local Hero</h4>
-                <p className="text-blue-100 mb-8 font-medium">Earn +{issue.rewardPoints * 2} community points by resolving this.</p>
-                <Button onClick={() => setShowProof(true)} className="w-full bg-white text-blue-600 py-4 rounded-[24px]">Complete Mission</Button>
-              </section>
-            )}
-            {isSuggestion && (
-              <section className="bg-green-600 p-8 rounded-[40px] text-white shadow-2xl shadow-green-100">
-                <h4 className="text-xl font-black mb-2">Support this Proposal</h4>
-                <p className="text-green-100 mb-8 font-medium">Community suggestions need {Math.max(0, 100 - issue.supportCount)} more boosts to be escalated to neighborhood council.</p>
-                <Button onClick={() => onSupport(issue.id)} className="w-full bg-white text-green-600 py-4 rounded-[24px]">Support Proposal</Button>
-              </section>
-            )}
-          </div>
-          {showProof && (
-            <div className="fixed inset-0 z-[2000] bg-black/60 backdrop-blur-md flex items-end justify-center">
-              <div className="bg-white w-full max-w-2xl rounded-t-[48px] p-10 flex flex-col gap-8 animate-in slide-in-from-bottom duration-500">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-2xl font-black">Submit Proof</h3>
-                  <button onClick={() => { setShowProof(false); onCloseResolution(); }} className="p-2"><Lucide.X size={24} /></button>
-                </div>
-                <div className="h-48 border-4 border-dashed rounded-[32px] flex flex-col items-center justify-center text-slate-300 gap-2 bg-slate-50">
-                  <Lucide.Video size={48} />
-                  <span className="text-xs font-black uppercase">Click to Select Video</span>
-                </div>
-                <Button onClick={() => { onResolve(issue.id, ""); setShowProof(false); onCloseResolution(); }} className="w-full py-5 text-xl font-black">Confirm Resolution</Button>
-              </div>
             </div>
-          )}
-          <div className="absolute bottom-0 left-0 right-0 p-8 bg-white/95 backdrop-blur-md border-t flex gap-4 pb-12">
+          </div>
+          <div className="absolute bottom-0 left-0 right-0 p-8 bg-white/95 backdrop-blur-md border-t flex gap-4">
             <Button onClick={() => onSupport(issue.id)} className="flex-1 py-4 text-lg">Support {isSuggestion ? 'Proposal' : 'Alert'}</Button>
-            <Button variant="outline" className="px-6"><Lucide.Share2 size={24} /></Button>
+            {!isSuggestion && issue.status !== 'Resolved' && <Button onClick={() => onResolve(issue.id)} className="flex-1 py-4 text-lg">Resolve Now</Button>}
           </div>
         </div>
       );
@@ -356,112 +419,47 @@
 
     const PostScreen = ({ onPost, initialCoords }) => {
       const [title, setTitle] = useState('');
+      const [description, setDescription] = useState('');
       const [category, setCategory] = useState('');
-      const [postType, setPostType] = useState('Issue'); // Issue | Suggestion
-      const [image, setImage] = useState(null);
-      const fileInputRef = useRef(null);
-
-      const handleImageChange = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            setImage(reader.result);
-          };
-          reader.readAsDataURL(file);
-        }
-      };
-
-      const triggerFileInput = () => {
-        fileInputRef.current.click();
-      };
-
+      const [postType, setPostType] = useState('Issue');
       return (
-        <div className="h-full bg-white rounded-[48px] shadow-2xl overflow-hidden flex flex-col border max-w-3xl mx-auto">
+        <div className="h-full bg-white rounded-[48px] shadow-2xl overflow-hidden flex flex-col border max-w-3xl mx-auto w-full">
           <header className="p-8 border-b bg-slate-50 flex justify-between items-center">
             <h2 className="text-2xl font-black">New {postType}</h2>
             <div className="flex bg-white rounded-xl p-1 border">
               {['Issue', 'Suggestion'].map(t => (
-                <button 
-                  key={t}
-                  onClick={() => setPostType(t)}
-                  className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all ${postType === t ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400'}`}
-                >
+                <button key={t} onClick={() => setPostType(t)} className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all ${postType === t ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400'}`}>
                   {t}
                 </button>
               ))}
             </div>
           </header>
-          <div className="flex-1 overflow-y-auto p-8 space-y-8 no-scrollbar">
-            <div 
-              onClick={triggerFileInput}
-              className="h-64 bg-slate-100 rounded-[32px] border-4 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 gap-2 overflow-hidden cursor-pointer hover:bg-slate-200 transition-colors"
-            >
-              {image ? (
-                <img src={image} className="w-full h-full object-cover" alt="Preview" />
-              ) : (
-                <>
-                  <Lucide.Camera size={48} />
-                  <span className="text-xs font-black uppercase">Add Photo {postType === 'Issue' ? 'Evidence' : 'Context'}</span>
-                </>
-              )}
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                className="hidden" 
-                accept="image/*" 
-                onChange={handleImageChange} 
+          <div className="flex-1 p-8 space-y-8 overflow-y-auto no-scrollbar">
+            <div className="h-48 bg-slate-100 rounded-[32px] border-4 border-dashed flex flex-col items-center justify-center text-slate-400 shrink-0"><Lucide.Camera size={48} /><span className="text-xs font-black uppercase mt-2">Add Proof Photo</span></div>
+            <div>
+              <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Title</label>
+              <input value={title} onChange={e => setTitle(e.target.value)} placeholder={`e.g. ${postType === 'Issue' ? "Broken pipe" : "New park idea"}`} className="w-full p-4 bg-slate-50 rounded-2xl focus:ring-2 ring-blue-600 outline-none font-bold" />
+            </div>
+            <div>
+              <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Description / Additional Info</label>
+              <textarea 
+                value={description} 
+                onChange={e => setDescription(e.target.value)} 
+                placeholder={`Provide more details about this ${postType.toLowerCase()}...`}
+                rows={4}
+                className="w-full p-4 bg-slate-50 rounded-2xl focus:ring-2 ring-blue-600 outline-none font-medium resize-none" 
               />
             </div>
-            <div className="space-y-6">
-              <div>
-                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Category</label>
-                <div className="flex flex-wrap gap-2">
-                  {CATEGORIES.map(c => (
-                    <button 
-                      key={c.id} 
-                      onClick={() => setCategory(c.name)} 
-                      className={`px-6 py-2.5 rounded-full text-xs font-black transition-all border-2 ${category === c.name ? (postType === 'Issue' ? 'bg-blue-600 border-blue-600 text-white shadow-lg' : 'bg-green-600 border-green-600 text-white shadow-lg') : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'}`}
-                    >
-                      {c.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">{postType} Title</label>
-                <input 
-                  value={title} 
-                  onChange={e => setTitle(e.target.value)} 
-                  placeholder={postType === 'Issue' ? "e.g. Broken water pipe near bus stop" : "e.g. Propose bike lanes on Church Road"} 
-                  className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:border-blue-600 outline-none font-bold placeholder:font-medium" 
-                />
+            <div>
+              <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Category</label>
+              <div className="flex flex-wrap gap-2">
+                {CATEGORIES.map(c => (
+                  <button key={c.id} onClick={() => setCategory(c.name)} className={`px-5 py-2 rounded-full text-xs font-black transition-all border-2 ${category === c.name ? 'bg-blue-600 border-blue-600 text-white' : 'text-slate-400'}`}>{c.name}</button>
+                ))}
               </div>
             </div>
           </div>
-          <div className="p-8 border-t flex gap-4">
-            <Button 
-              onClick={() => onPost({ 
-                id: Math.random().toString(), 
-                type: postType.toLowerCase(),
-                title, 
-                category, 
-                image: image || 'https://images.unsplash.com/photo-1528190336454-13cd56b45b5a?auto=format&fit=crop&w=600', 
-                supportCount: 0, 
-                comments: [], 
-                status: postType === 'Issue' ? 'Reported' : 'Proposed', 
-                rewardPoints: postType === 'Issue' ? 50 : 30, 
-                lat: initialCoords?.lat || 11.25, 
-                lng: initialCoords?.lng || 75.78, 
-                area: initialCoords ? `Lat: ${initialCoords.lat.toFixed(3)}` : 'Neighborhood Zone' 
-              })} 
-              disabled={!title || !category} 
-              variant={postType === 'Issue' ? 'primary' : 'secondary'}
-              className="flex-1 py-5 text-lg"
-            >
-              Post {postType} to Neighborhood
-            </Button>
-          </div>
+          <div className="p-8 border-t"><Button onClick={() => onPost({ id: Math.random().toString(), type: postType.toLowerCase(), title, description, category, image: 'https://images.unsplash.com/photo-1528190336454-13cd56b45b5a?auto=format&fit=crop&w=600', supportCount: 0, comments: [], status: 'Reported', rewardPoints: 50, lat: initialCoords?.lat || 11.25, lng: initialCoords?.lng || 75.78, area: 'Current Area', createdAt: 'Today', creator: CURRENT_USER.name })} disabled={!title || !category} className="w-full py-5 text-lg">Post to Neighborhood</Button></div>
         </div>
       );
     };
@@ -474,96 +472,79 @@
       const [toast, setToast] = useState(null);
       const [prefilled, setPrefilled] = useState(null);
 
-      const showToast = (message, type = 'info') => {
-        setToast({ message, type });
+      const showToast = (message) => {
+        setToast(message);
         setTimeout(() => setToast(null), 3000);
       };
 
       const handleSupport = (id) => {
         setIssues(prev => prev.map(i => i.id === id ? { ...i, supportCount: i.supportCount + 1 } : i));
-        showToast("Boost successful!", "success");
+        showToast("Community Boosted!");
       };
 
       const handleResolve = (id) => {
         setIssues(prev => prev.map(i => i.id === id ? { ...i, status: 'Resolved' } : i));
-        showToast("Mission accomplished!", "success");
+        showToast("Hero Mission Confirmed!");
       };
 
       const handleNewPost = (newIssue) => {
         setIssues([newIssue, ...issues]);
         setTab('feed');
-        showToast(`${newIssue.type.charAt(0).toUpperCase() + newIssue.type.slice(1)} successful!`, "success");
+        showToast("Post Live!");
         setPrefilled(null);
       };
 
+      const myActivity = useMemo(() => issues.filter(i => i.creator === CURRENT_USER.name), [issues]);
+
       return (
         <div className="flex h-screen bg-slate-50 overflow-hidden">
-          {/* Toast */}
-          {toast && (
-            <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-[3000] px-6 py-3 rounded-2xl shadow-2xl border text-white font-black animate-in slide-in-from-top duration-300 ${toast.type === 'success' ? 'bg-green-600 border-green-500' : 'bg-slate-900 border-slate-700'}`}>
-              {toast.message}
-            </div>
-          )}
+          {toast && <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[3000] px-6 py-3 rounded-2xl shadow-2xl bg-slate-900 text-white font-black animate-in slide-in-from-top duration-300">{toast}</div>}
 
-          {/* Sidebar (Desktop) */}
           <aside className="hidden lg:flex flex-col w-72 bg-white border-r p-10 shrink-0">
             <div className="flex items-center gap-4 mb-12 cursor-pointer" onClick={() => { setTab('feed'); setSelected(null); }}>
               <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white"><Lucide.ShieldAlert size={24} /></div>
               <h1 className="text-2xl font-black tracking-tighter">CivicPulse</h1>
             </div>
             <nav className="space-y-2 flex-1">
-              {['feed', 'map', 'leaderboard', 'profile'].map(t => (
-                <button key={t} onClick={() => { setTab(t); setSelected(null); }} className={`w-full flex items-center gap-4 px-6 py-3.5 rounded-2xl font-black capitalize transition-all ${tab === t ? 'bg-blue-600 text-white shadow-xl' : 'text-slate-400 hover:bg-slate-50'}`}>
-                  {t === 'feed' && <Lucide.Home size={20} />}
-                  {t === 'map' && <Lucide.MapIcon size={20} />}
-                  {t === 'leaderboard' && <Lucide.Trophy size={20} />}
-                  {t === 'profile' && <Lucide.User size={20} />}
-                  {t}
+              {[
+                { id: 'feed', icon: Lucide.Home },
+                { id: 'map', icon: Lucide.MapIcon },
+                { id: 'leaderboard', icon: Lucide.Trophy },
+                { id: 'profile', icon: Lucide.User }
+              ].map(t => (
+                <button key={t.id} onClick={() => { setTab(t.id); setSelected(null); }} className={`w-full flex items-center gap-4 px-6 py-3.5 rounded-2xl font-black capitalize transition-all ${tab === t.id ? 'bg-blue-600 text-white shadow-xl' : 'text-slate-400 hover:bg-slate-50'}`}>
+                  <t.icon size={20} /> {t.id}
                 </button>
               ))}
             </nav>
             <Button onClick={() => setTab('post')} className="py-4 mt-8"><Lucide.PlusCircle size={20} /> Raise Post</Button>
           </aside>
 
-          {/* Main Container */}
           <div className="flex-1 flex flex-col relative overflow-hidden">
-            {/* Mobile Header */}
             <header className="lg:hidden h-16 bg-white border-b px-6 flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-3 cursor-pointer" onClick={() => { setTab('feed'); setSelected(null); }}>
-                <Lucide.ShieldAlert className="text-blue-600" />
-                <h1 className="text-xl font-black tracking-tighter">CivicPulse</h1>
-              </div>
+              <div className="flex items-center gap-3" onClick={() => { setTab('feed'); setSelected(null); }}><Lucide.ShieldAlert className="text-blue-600" /><h1 className="text-xl font-black tracking-tighter">CivicPulse</h1></div>
               <Lucide.Bell className="text-slate-400" />
             </header>
 
-            <main className="flex-1 overflow-y-auto relative no-scrollbar bg-slate-50/50">
+            <main className="flex-1 overflow-y-auto relative no-scrollbar">
               {selected ? (
-                <div className="max-w-4xl mx-auto h-full md:p-6">
-                  <IssueDetailScreen 
-                    issue={selected} 
-                    onBack={() => setSelected(null)} 
-                    onSupport={handleSupport} 
-                    onResolve={handleResolve} 
-                    onCloseResolution={() => { setTab('feed'); setSelected(null); }} 
-                  />
-                </div>
+                <div className="max-w-4xl mx-auto h-full md:p-6"><IssueDetailScreen issue={selected} onBack={() => setSelected(null)} onSupport={handleSupport} onResolve={handleResolve} /></div>
               ) : (
                 <div className="max-w-7xl mx-auto p-4 md:p-8 h-full">
                   {tab === 'feed' && <FeedScreen issues={issues} onIssueClick={setSelected} onSupport={handleSupport} onActionClick={showToast} />}
                   {tab === 'map' && <div className="h-full"><MapScreen issues={issues} onIssueClick={setSelected} onStartPost={(lat, lng) => { setPrefilled({lat, lng}); setTab('post'); }} onActionClick={showToast} /></div>}
                   {tab === 'post' && <div className="h-full flex items-center justify-center"><PostScreen initialCoords={prefilled} onPost={handleNewPost} /></div>}
-                  {tab === 'leaderboard' && <div className="text-center py-20"><Lucide.Trophy size={64} className="mx-auto text-yellow-500 mb-6" /><h2 className="text-3xl font-black">Coming Soon</h2><p className="text-slate-500">Global community rankings are being calculated.</p></div>}
-                  {tab === 'profile' && <div className="max-w-xl mx-auto text-center py-20"><div className="w-24 h-24 bg-blue-600 text-white rounded-[32px] flex items-center justify-center text-3xl font-black mx-auto mb-6">CP</div><h2 className="text-3xl font-black">CitizenPulse #4021</h2><p className="text-slate-500">Kozhikode, Kerala</p></div>}
+                  {tab === 'leaderboard' && <LeaderboardScreen leaderboard={MOCK_LEADERBOARD} />}
+                  {tab === 'profile' && <ProfileScreen user={CURRENT_USER} myIssues={myActivity} />}
                 </div>
               )}
             </main>
 
-            {/* Mobile Nav */}
             {!selected && (
-              <nav className="lg:hidden h-20 bg-white border-t flex items-center justify-around shrink-0 pb-safe">
+              <nav className="lg:hidden h-20 bg-white border-t flex items-center justify-around shrink-0 pb-safe z-[2000]">
                 <button onClick={() => setTab('feed')} className={`flex flex-col items-center gap-1 ${tab === 'feed' ? 'text-blue-600' : 'text-slate-300'}`}><Lucide.Home size={22} /><span className="text-[9px] font-black uppercase">Feed</span></button>
                 <button onClick={() => setTab('map')} className={`flex flex-col items-center gap-1 ${tab === 'map' ? 'text-blue-600' : 'text-slate-300'}`}><Lucide.MapIcon size={22} /><span className="text-[9px] font-black uppercase">Map</span></button>
-                <button onClick={() => setTab('post')} className="w-14 h-14 bg-blue-600 text-white rounded-2xl shadow-xl -mt-8 border-4 border-white flex items-center justify-center transition-transform active:scale-90"><Lucide.Plus size={32} /></button>
+                <button onClick={() => setTab('post')} className="w-14 h-14 bg-blue-600 text-white rounded-2xl shadow-xl -mt-8 border-4 border-white flex items-center justify-center"><Lucide.Plus size={32} /></button>
                 <button onClick={() => setTab('leaderboard')} className={`flex flex-col items-center gap-1 ${tab === 'leaderboard' ? 'text-blue-600' : 'text-slate-300'}`}><Lucide.Trophy size={22} /><span className="text-[9px] font-black uppercase">Ranks</span></button>
                 <button onClick={() => setTab('profile')} className={`flex flex-col items-center gap-1 ${tab === 'profile' ? 'text-blue-600' : 'text-slate-300'}`}><Lucide.User size={22} /><span className="text-[9px] font-black uppercase">Me</span></button>
               </nav>
